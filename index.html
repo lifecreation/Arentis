@@ -1,0 +1,2410 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arentis — Personal Money Manager</title>
+  <link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<meta name="theme-color" content="#000000">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #161a23;
+    --surface2: #1e2333;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #f0f0f0;
+    --text2: #8a8fa8;
+    --text3: #555c75;
+    --green: #4ade80;
+    --green-dim: rgba(74,222,128,0.12);
+    --green-border: rgba(74,222,128,0.25);
+    --red: #f87171;
+    --red-dim: rgba(248,113,113,0.12);
+    --red-border: rgba(248,113,113,0.25);
+    --paytm: #00baf2;
+    --paytm-dim: rgba(0,186,242,0.1);
+    --paytm-border: rgba(0,186,242,0.25);
+    --gold: #fbbf24;
+    --gold-dim: rgba(251,191,36,0.1);
+    --radius: 14px;
+    --radius-sm: 8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse 80% 50% at 20% 0%, rgba(74,222,128,0.04) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 40% at 80% 100%, rgba(0,186,242,0.04) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper { position: relative; z-index: 1; max-width: 480px; margin: 0 auto; padding: 0 16px 100px; }
+
+  /* ── Profile bar (avatar + greeting + bell) ── */
+  .profile-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 0 0;
+  }
+  .profile-left { display: flex; align-items: center; gap: 10px; }
+  .profile-avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--green), #22a35a);
+    color: #0a1a10; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 16px; flex-shrink: 0;
+    font-family: 'DM Sans', sans-serif;
+    box-shadow: 0 2px 10px rgba(74,222,128,0.25);
+    overflow: hidden;
+  }
+  .profile-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+  .profile-text { display: flex; flex-direction: column; line-height: 1.25; }
+  .profile-greeting { font-size: 11.5px; color: var(--text2); }
+  .profile-name { font-size: 14.5px; font-weight: 600; color: var(--text); }
+  .bell-btn {
+    position: relative;
+    background: var(--surface2);
+    border: 0.5px solid var(--border2);
+    border-radius: 50%;
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+  }
+  .bell-btn:hover { background: var(--surface); }
+  .bell-btn:active { transform: scale(0.94); }
+  .bell-dot {
+    position: absolute; top: 3px; right: 3px;
+    min-width: 16px; height: 16px; padding: 0 4px;
+    background: var(--green); color: #0a1a10;
+    border-radius: 10px; border: 2px solid var(--bg);
+    font-size: 9px; font-weight: 700;
+    display: none; align-items: center; justify-content: center;
+    font-family: 'DM Sans', sans-serif; line-height: 1;
+  }
+
+  /* ── Notification panel ── */
+  .notif-dropdown {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.28s ease, opacity 0.2s ease, margin 0.28s ease;
+    margin-top: 0;
+  }
+  .notif-dropdown.show {
+    max-height: 600px;
+    opacity: 1;
+    margin-top: 10px;
+  }
+  .notif-dropdown-arrow {
+    width: 14px; height: 14px;
+    background: var(--surface);
+    border-right: 0.5px solid var(--border2);
+    border-top: 0.5px solid var(--border2);
+    transform: rotate(45deg);
+    margin: 0 18px -7px auto;
+    position: relative;
+    z-index: 1;
+  }
+  .notif-dropdown-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .notif-dropdown-header h3 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .notif-item {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 12px 0; border-bottom: 0.5px solid var(--border);
+  }
+  .notif-item:last-child { border-bottom: none; padding-bottom: 2px; }
+  .notif-icon {
+    font-size: 16px; width: 32px; height: 32px; border-radius: 9px;
+    background: var(--surface2); display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .notif-body { flex: 1; min-width: 0; }
+  .notif-title { font-size: 12.5px; font-weight: 600; color: var(--text); }
+  .notif-desc { font-size: 11.5px; color: var(--text2); margin-top: 2px; line-height: 1.5; }
+  .notif-action {
+    margin-top: 8px; font-size: 11px; padding: 5px 12px; border-radius: 20px;
+    background: var(--green-dim); color: var(--green); border: 0.5px solid var(--green-border);
+    cursor: pointer; font-family: 'DM Sans', sans-serif;
+  }
+  .notif-dismiss {
+    flex-shrink: 0; width: 22px; height: 22px; border-radius: 7px;
+    background: var(--surface2); border: 0.5px solid var(--border2); color: var(--text2);
+    font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .notif-dismiss:hover { background: var(--red-dim); color: var(--red); border-color: var(--red-border); }
+  .notif-empty { text-align: center; padding: 20px 10px; font-size: 12.5px; color: var(--text3); }
+
+  /* profile avatar/left gets a visible highlight while dropdown is open */
+  .profile-left {
+    border-radius: 24px;
+    padding: 4px 8px 4px 4px;
+    transition: background 0.2s ease;
+  }
+  .profile-left.open {
+    background: var(--surface2);
+  }
+  .profile-left.open .profile-avatar {
+    box-shadow: 0 0 0 3px var(--green-dim), 0 2px 10px rgba(74,222,128,0.25);
+  }
+
+  /* dropdown panel that opens under the avatar */
+  .account-dropdown {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.28s ease, opacity 0.2s ease, margin 0.28s ease;
+    margin-top: 0;
+  }
+  .account-dropdown.show {
+    max-height: 600px;
+    opacity: 1;
+    margin-top: 10px;
+  }
+  .account-dropdown-arrow {
+    width: 14px; height: 14px;
+    background: var(--surface);
+    border-left: 0.5px solid var(--border2);
+    border-top: 0.5px solid var(--border2);
+    transform: rotate(45deg);
+    margin: 0 0 -7px 18px;
+    position: relative;
+    z-index: 1;
+  }
+  .account-dropdown-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+
+  .header {
+    padding: 14px 0 20px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+  @keyframes floatTitleGlow {
+    0%, 100% { transform: translateY(0); text-shadow: 0 0 5px rgba(74,222,128,0.05); }
+    50% { transform: translateY(-1.5px); text-shadow: 0 0 12px rgba(74,222,128,0.3), 0 0 20px rgba(74,222,128,0.1); }
+  }
+  .header-left h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+    animation: floatTitleGlow 6s ease-in-out infinite;
+    display: inline-block;
+  }
+  .header-left h1 span { color: var(--green); text-shadow: inherit; }
+  .header-left p { font-size: 12px; color: var(--text2); margin-top: 4px; }
+  .date-chip {
+    background: var(--surface2);
+    border: 0.5px solid var(--border2);
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 11px;
+    color: var(--text2);
+    white-space: nowrap;
+  }
+
+  .hero-card {
+    background: linear-gradient(135deg, #1a2535 0%, #1e2a20 100%);
+    border: 0.5px solid var(--green-border);
+    border-radius: 20px;
+    padding: 24px;
+    margin-bottom: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-card::after {
+    content: '₹';
+    position: absolute;
+    right: -10px;
+    top: -20px;
+    font-family: 'Playfair Display', serif;
+    font-size: 130px;
+    color: rgba(74,222,128,0.04);
+    line-height: 1;
+    pointer-events: none;
+  }
+  .hero-label { font-size: 11px; color: var(--text2); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+  .hero-amount { font-family: 'Playfair Display', serif; font-size: 42px; font-weight: 700; line-height: 1; }
+  .hero-amount.positive { color: var(--green); }
+  .hero-amount.negative { color: var(--red); }
+  .hero-amount.zero { color: var(--text2); }
+  .hero-sub { font-size: 12px; color: var(--text2); margin-top: 8px; }
+
+  .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .stat-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .stat-card.green-card { border-color: var(--green-border); background: var(--green-dim); }
+  .stat-card.red-card { border-color: var(--red-border); background: var(--red-dim); }
+  .stat-icon { font-size: 18px; margin-bottom: 8px; }
+  .stat-label { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+  .stat-value { font-size: 20px; font-weight: 600; }
+  .stat-card.green-card .stat-value { color: var(--green); }
+  .stat-card.red-card .stat-value { color: var(--red); }
+
+  .paytm-card {
+    background: var(--paytm-dim);
+    border: 0.5px solid var(--paytm-border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .paytm-left { display: flex; align-items: center; gap: 12px; }
+  .paytm-icon {
+    width: 38px; height: 38px;
+    background: var(--paytm);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 700; color: #fff;
+    font-family: 'DM Sans', sans-serif;
+    letter-spacing: -1px;
+  }
+  .paytm-info .label { font-size: 11px; color: var(--text2); }
+  .paytm-info .val { font-size: 20px; font-weight: 600; color: var(--paytm); }
+  .paytm-badge {
+    background: rgba(0,186,242,0.15);
+    color: var(--paytm);
+    border: 0.5px solid var(--paytm-border);
+    border-radius: 20px;
+    font-size: 11px;
+    padding: 4px 10px;
+  }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab {
+    flex: 1; padding: 10px; background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm); font-size: 12.5px; font-weight: 500; color: var(--text2);
+    cursor: pointer; text-align: center; transition: all 0.2s;
+  }
+  .tab.active { background: var(--surface2); border-color: var(--border2); color: var(--text); }
+
+  .form-section { display: none; }
+  .form-section.active { display: block; }
+  .form-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .form-card h3 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 16px; }
+  .frow { margin-bottom: 14px; }
+  .frow label { font-size: 11px; color: var(--text2); letter-spacing: 0.5px; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  .frow input, .frow select {
+    width: 100%;
+    background: var(--surface2);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm);
+    padding: 11px 14px;
+    font-size: 14px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+  }
+  .frow input:focus, .frow select:focus { border-color: rgba(255,255,255,0.25); }
+  .frow input::placeholder { color: var(--text3); }
+  .frow select option { background: #1e2333; color: #f0f0f0; }
+  .amount-wrap { position: relative; }
+  .amount-wrap span { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text2); font-size: 15px; }
+  .amount-wrap input { padding-left: 28px; }
+  .frow input[type="date"] { color-scheme: dark; }
+  .lock-warning {
+    display: none;
+    background: var(--red-dim); border: 0.5px solid var(--red-border);
+    border-radius: var(--radius-sm); padding: 10px 12px; font-size: 12px; color: var(--red);
+    margin-bottom: 14px;
+  }
+  .lock-warning.show { display: block; }
+
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+  .btn {
+    padding: 13px;
+    border-radius: var(--radius-sm);
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: transform 0.15s, opacity 0.15s, box-shadow 0.2s;
+    letter-spacing: 0.2px;
+  }
+  .btn:active { transform: scale(0.97); opacity: 0.85; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-in { background: var(--green); color: #0a1a10; }
+  .btn-in:hover { box-shadow: 0 0 20px rgba(74,222,128,0.5); }
+  .btn-out { background: var(--red); color: #1a0a0a; }
+  .btn-out:hover { box-shadow: 0 0 20px rgba(248,113,113,0.5); }
+
+  .entries-section { display: none; }
+  .entries-section.active { display: block; }
+
+  .scope-row { margin-bottom: 12px; }
+  .scope-row select {
+    width: 100%;
+    background: var(--surface2);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+    -webkit-appearance: none;
+  }
+  .scope-row select option { background: #1e2333; color: #f0f0f0; }
+
+  .filter-row { display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; padding-bottom: 4px; }
+  .filter-row::-webkit-scrollbar { display: none; }
+  .filter-chip {
+    white-space: nowrap; padding: 6px 14px;
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: 20px; font-size: 12px; color: var(--text2); cursor: pointer;
+    transition: all 0.2s;
+  }
+  .filter-chip.active { background: var(--surface2); border-color: var(--border2); color: var(--text); }
+
+  .entries-header {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+  }
+  .entries-header span { font-size: 13px; color: var(--text2); }
+  .clear-btn {
+    font-size: 11px; color: var(--red); background: var(--red-dim);
+    border: 0.5px solid var(--red-border); border-radius: 20px;
+    padding: 4px 10px; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    transition: box-shadow 0.2s, background 0.2s;
+  }
+  .clear-btn:hover {
+    box-shadow: 0 0 12px rgba(248,113,113,0.4);
+    background: rgba(248,113,113,0.2);
+  }
+
+  .day-group { margin-bottom: 18px; }
+  .day-group-header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 0 2px 8px; border-bottom: 0.5px solid var(--border);
+    margin-bottom: 10px;
+  }
+  .day-group-title { font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 6px; }
+  .day-group-sub { font-size: 11px; color: var(--text2); }
+  .day-lock-tag {
+    font-size: 9.5px; color: var(--gold); background: var(--gold-dim);
+    border: 0.5px solid rgba(251,191,36,0.3); border-radius: 10px; padding: 1px 6px;
+  }
+
+  .entry-item {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    animation: slideIn 0.25s ease;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .entry-dot {
+    width: 36px; height: 36px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+  }
+  .dot-in { background: var(--green-dim); }
+  .dot-out { background: var(--red-dim); }
+  .entry-body { flex: 1; min-width: 0; }
+  .entry-desc { font-size: 14px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .entry-meta { font-size: 11px; color: var(--text2); margin-top: 3px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .entry-tag {
+    background: var(--surface2); border: 0.5px solid var(--border);
+    border-radius: 4px; padding: 1px 6px; font-size: 10px; color: var(--text2);
+  }
+  .entry-tag.paytm-tag { background: var(--paytm-dim); border-color: var(--paytm-border); color: var(--paytm); }
+  .entry-amount { font-size: 16px; font-weight: 600; flex-shrink: 0; }
+  .amt-in { color: var(--green); }
+  .amt-out { color: var(--red); }
+  .entry-del {
+    flex-shrink: 0; width: 26px; height: 26px; border-radius: 8px;
+    background: var(--surface2); border: 0.5px solid var(--border2); color: var(--text2);
+    font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .entry-del:hover { background: var(--red-dim); color: var(--red); border-color: var(--red-border); }
+
+  .empty-state { text-align: center; padding: 50px 20px; }
+  .empty-state .icon { font-size: 40px; margin-bottom: 12px; opacity: 0.3; }
+  .empty-state p { font-size: 13px; color: var(--text3); }
+
+  .onboard-card {
+    background: var(--green-dim); border: 0.5px solid var(--green-border);
+    border-radius: var(--radius); padding: 16px 18px; margin-bottom: 14px;
+  }
+  .onboard-card h4 { font-size: 13px; font-weight: 600; color: var(--green); margin-bottom: 8px; }
+  .onboard-card ol { padding-left: 18px; }
+  .onboard-card li { font-size: 12px; color: var(--text2); line-height: 1.7; }
+
+  .chart-section { display: none; }
+  .chart-section.active { display: block; }
+  .chart-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 12px;
+  }
+  .chart-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 18px; color: var(--text); }
+  .bar-group { margin-bottom: 14px; }
+  .bar-top { display: flex; justify-content: space-between; margin-bottom: 5px; }
+  .bar-top span { font-size: 12px; color: var(--text2); }
+  .bar-top strong { font-size: 12px; font-weight: 600; }
+  .bar-track { height: 10px; background: var(--surface2); border-radius: 5px; overflow: hidden; position: relative; }
+  .bar-fill { height: 100%; border-radius: 5px; transition: width 0.6s cubic-bezier(.4,0,.2,1); position: relative; overflow: hidden; }
+  .bf-green { background: var(--green); }
+  .bf-red { background: var(--red); }
+  .bf-blue { background: var(--paytm); }
+
+  .cat-grid { display: grid; gap: 8px; }
+  .cat-row { display: flex; align-items: center; gap: 10px; }
+  .cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .cat-name { font-size: 13px; color: var(--text2); flex: 1; }
+  .cat-val { font-size: 13px; font-weight: 500; }
+  .cat-bar { flex: 2; height: 4px; background: var(--surface2); border-radius: 2px; overflow: hidden; position: relative; }
+  .cat-bar-fill { height: 100%; border-radius: 2px; position: relative; overflow: hidden; transition: width 0.6s cubic-bezier(.4,0,.2,1); }
+
+  /* ── Donut chart (category breakdown ring) ── */
+  .donut-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 20px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+  }
+  .donut-wrap {
+    position: relative;
+    width: 180px;
+    height: 180px;
+    flex-shrink: 0;
+  }
+  .donut-ring {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    position: relative;
+    transition: background 0.4s ease;
+  }
+  .donut-ring::after {
+    content: '';
+    position: absolute;
+    inset: 26px;
+    background: var(--surface);
+    border-radius: 50%;
+  }
+  .donut-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    z-index: 1;
+  }
+  .donut-label { font-size: 10.5px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+  .donut-value { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; color: var(--text); margin-top: 5px; }
+  .donut-sub { font-size: 11px; color: var(--text2); margin-top: 3px; }
+  .donut-legend {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px 12px;
+    width: 100%;
+  }
+  .donut-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text2);
+    min-width: 0;
+  }
+  .donut-legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .donut-legend-item span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .reports-section { display: none; }
+  .reports-section.active { display: block; }
+  .report-note {
+    font-size: 11.5px; color: var(--text2); background: var(--surface);
+    border: 0.5px solid var(--border); border-radius: var(--radius-sm);
+    padding: 10px 12px; margin-bottom: 14px; line-height: 1.5;
+  }
+  .report-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 10px;
+  }
+  .report-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .report-date { font-size: 14px; font-weight: 600; color: var(--text); }
+  .report-count { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .report-nums { display: flex; gap: 14px; margin-bottom: 12px; }
+  .report-num-block .lbl { font-size: 10px; color: var(--text2); text-transform: uppercase; }
+  .report-num-block .val { font-size: 15px; font-weight: 600; }
+  .report-num-block.in .val { color: var(--green); }
+  .report-num-block.out .val { color: var(--red); }
+  .report-num-block.net .val { color: var(--text); }
+  .lock-badge {
+    font-size: 10px; padding: 3px 9px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px;
+  }
+  .lock-badge.locked { background: var(--gold-dim); color: var(--gold); border: 0.5px solid rgba(251,191,36,0.3); }
+  .lock-badge.open { background: var(--green-dim); color: var(--green); border: 0.5px solid var(--green-border); }
+  .btn-pdf {
+    width: 100%; padding: 11px; border-radius: var(--radius-sm); border: none;
+    font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    background: var(--surface2); color: var(--text); border: 0.5px solid var(--border2);
+    transition: all 0.2s;
+  }
+  .btn-pdf.primary { background: var(--gold-dim); color: var(--gold); border-color: rgba(251,191,36,0.3); }
+  .btn-pdf:active { transform: scale(0.98); }
+  .correction-note-wrap { margin-top: 10px; }
+  .correction-note-wrap textarea {
+    width: 100%; background: var(--surface2); border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm); padding: 8px 10px; font-size: 12px; color: var(--text);
+    font-family: 'DM Sans', sans-serif; resize: vertical; min-height: 44px; outline: none;
+  }
+  .correction-note-wrap .note-label { font-size: 10px; color: var(--gold); text-transform: uppercase; margin-bottom: 5px; display: block; }
+  .correction-note-wrap .note-save {
+    margin-top: 6px; font-size: 11px; padding: 6px 12px; border-radius: 20px;
+    background: var(--gold-dim); color: var(--gold); border: 0.5px solid rgba(251,191,36,0.3);
+    cursor: pointer; font-family: 'DM Sans', sans-serif;
+  }
+  .existing-note { font-size: 11.5px; color: var(--text2); background: var(--surface2); border-radius: var(--radius-sm); padding: 8px 10px; margin-top: 8px; line-height: 1.5; }
+
+  /* ══════════════════ Floating pill bottom nav ══════════════════ */
+  .bottom-nav {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    background: rgba(22,26,35,0.92);
+    backdrop-filter: blur(20px);
+    border: 0.5px solid var(--border2);
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px;
+    z-index: 100;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.45);
+    max-width: calc(100% - 32px);
+  }
+  .nav-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 10px 14px; background: none; border: none; cursor: pointer;
+    color: var(--text2); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+    border-radius: 999px;
+    transition: all 0.25s cubic-bezier(.4,0,.2,1);
+    white-space: nowrap;
+  }
+  .nav-btn .nav-icon {
+    font-size: 15px; line-height: 1;
+    width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface2);
+    flex-shrink: 0;
+    transition: all 0.25s cubic-bezier(.4,0,.2,1);
+  }
+  .nav-btn .nav-label {
+    max-width: 0; opacity: 0; overflow: hidden;
+    transition: max-width 0.25s cubic-bezier(.4,0,.2,1), opacity 0.2s ease;
+  }
+  .nav-btn.active {
+    color: #0a1a10;
+    background: var(--green);
+    box-shadow: 0 0 16px rgba(74,222,128,0.4);
+  }
+  .nav-btn.active .nav-icon {
+    background: rgba(10,26,16,0.15);
+  }
+  .nav-btn.active .nav-label {
+    max-width: 80px; opacity: 1; margin-left: 0;
+  }
+  .nav-btn:not(.active):active { transform: scale(0.92); }
+
+  .toast {
+    position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--surface2); border: 0.5px solid var(--border2);
+    border-radius: 20px; padding: 10px 20px; font-size: 13px; color: var(--text);
+    opacity: 0; transition: all 0.3s; z-index: 200; white-space: nowrap;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  #cursorGlow {
+    position: fixed;
+    top: -1000px;
+    left: -1000px;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(74, 222, 128, 0.05) 0%, transparent 60%);
+    border-radius: 50%;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    z-index: 0;
+    transition: background 0.3s ease;
+  }
+
+  #rupees-container {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 0; overflow: hidden;
+  }
+  .rupee-float {
+    position: absolute; top: -50px;
+    color: rgba(74, 222, 128, 0.15);
+    font-family: 'Playfair Display', serif;
+    animation: rainRupees linear infinite;
+  }
+  @keyframes rainRupees {
+    0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+  }
+
+  .loading-overlay {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    z-index: 999; color: var(--text2); font-size: 13px;
+  }
+  .loading-spinner {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: 3px solid var(--surface2); border-top-color: var(--green);
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Backup & Restore ── */
+  .backup-reminder {
+    display: none;
+    background: var(--gold-dim); border: 0.5px solid rgba(251,191,36,0.3);
+    border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 14px;
+    font-size: 12px; color: var(--gold);
+    align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .backup-reminder.show { display: flex; }
+  .backup-reminder button {
+    background: rgba(251,191,36,0.18); border: 0.5px solid rgba(251,191,36,0.35);
+    color: var(--gold); border-radius: 20px; padding: 5px 10px; font-size: 11px;
+    font-family: 'DM Sans', sans-serif; cursor: pointer; white-space: nowrap;
+  }
+  .backup-card { margin-bottom: 16px; }
+  .backup-status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .backup-status-item {
+    background: var(--surface2); border: 0.5px solid var(--border);
+    border-radius: var(--radius-sm); padding: 12px;
+  }
+  .backup-status-item .lbl { font-size: 10px; color: var(--text2); text-transform: uppercase; margin-bottom: 4px; }
+  .backup-status-item .val { font-size: 14px; font-weight: 600; color: var(--text); }
+  .backup-btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btn-export {
+    background: var(--green-dim); color: var(--green); border: 0.5px solid var(--green-border);
+    padding: 13px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: 'DM Sans', sans-serif; text-align: center;
+  }
+  .btn-import {
+    background: var(--paytm-dim); color: var(--paytm); border: 0.5px solid var(--paytm-border);
+    padding: 13px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: 'DM Sans', sans-serif; text-align: center;
+  }
+  .btn-csv {
+    background: var(--gold-dim); color: var(--gold); border: 0.5px solid rgba(251,191,36,0.3);
+    padding: 13px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: 'DM Sans', sans-serif; text-align: center; margin-top: 10px; width: 100%;
+  }
+  #importFileInput { display: none; }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+    display: none; align-items: center; justify-content: center;
+    z-index: 500; padding: 20px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal-box {
+    background: var(--surface); border: 0.5px solid var(--border2);
+    border-radius: var(--radius); padding: 22px; max-width: 420px; width: 100%;
+    max-height: 85vh; overflow-y: auto;
+  }
+  .modal-box h3 { font-size: 15px; font-weight: 600; margin-bottom: 12px; color: var(--text); }
+  .modal-box p { font-size: 13px; color: var(--text2); line-height: 1.6; margin-bottom: 10px; }
+  .modal-info-row {
+    display: flex; justify-content: space-between; font-size: 12.5px;
+    padding: 7px 0; border-bottom: 0.5px solid var(--border);
+  }
+  .modal-info-row span:first-child { color: var(--text2); }
+  .modal-info-row span:last-child { color: var(--text); font-weight: 500; }
+  .modal-btn-col { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+  .modal-btn {
+    padding: 13px; border-radius: var(--radius-sm); border: none; font-size: 14px;
+    font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+  }
+  .modal-btn.merge { background: var(--paytm-dim); color: var(--paytm); border: 0.5px solid var(--paytm-border); }
+  .modal-btn.replace { background: var(--red-dim); color: var(--red); border: 0.5px solid var(--red-border); }
+  .modal-btn.cancel { background: var(--surface2); color: var(--text2); border: 0.5px solid var(--border2); }
+
+  /* ── PIN lock screen ── */
+  .pin-screen {
+    position: fixed; inset: 0; background: var(--bg); z-index: 1000;
+    display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    padding: 24px;
+  }
+  .pin-screen.show { display: flex; }
+  .pin-screen h2 { font-family: 'Playfair Display', serif; font-size: 22px; }
+  .pin-screen h2 span { color: var(--green); }
+  .pin-dots { display: flex; gap: 14px; }
+  .pin-dot { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--border2); background: transparent; transition: all 0.15s; }
+  .pin-dot.filled { background: var(--green); border-color: var(--green); }
+  .pin-pad { display: grid; grid-template-columns: repeat(3, 64px); gap: 14px; margin-top: 6px; }
+  .pin-key {
+    width: 64px; height: 64px; border-radius: 50%; background: var(--surface);
+    border: 0.5px solid var(--border2); color: var(--text); font-size: 20px;
+    font-family: 'DM Sans', sans-serif; cursor: pointer;
+  }
+  .pin-key:active { background: var(--surface2); }
+  .pin-key.ghost { background: transparent; border: none; cursor: default; }
+  .pin-error { color: var(--red); font-size: 12px; min-height: 16px; }
+  .pin-sub { color: var(--text2); font-size: 12px; text-align: center; max-width: 260px; line-height: 1.5; }
+  .pin-skip { color: var(--text3); font-size: 12px; text-decoration: underline; cursor: pointer; margin-top: 6px; background: none; border: none; font-family: 'DM Sans', sans-serif; }
+
+  .amt-range-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .amt-range-row input {
+    width: 100%; background: var(--surface2); border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm); padding: 9px 12px; font-size: 12.5px; color: var(--text);
+    font-family: 'DM Sans', sans-serif; outline: none;
+  }
+  .search-row { margin-bottom: 10px; }
+  .search-row input {
+    width: 100%; background: var(--surface2); border: 0.5px solid var(--border2);
+    border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; color: var(--text);
+    font-family: 'DM Sans', sans-serif; outline: none;
+  }
+
+  /* ── Auth (login/signup) screen ── */
+  .auth-screen {
+    position: fixed; inset: 0; background: var(--bg); z-index: 1001;
+    display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    padding: 24px;
+  }
+  .auth-screen.show { display: flex; }
+  .auth-screen h2 { font-family: 'Playfair Display', serif; font-size: 26px; }
+  .auth-screen h2 span { color: var(--green); }
+  .auth-sub { color: var(--text2); font-size: 12.5px; text-align: center; }
+  .auth-card {
+    background: var(--surface); border: 0.5px solid var(--border);
+    border-radius: var(--radius); padding: 22px; width: 100%; max-width: 340px;
+  }
+  .auth-error { font-size: 12px; min-height: 16px; margin: 6px 0 10px; line-height: 1.5; }
+  .auth-toggle { text-align: center; font-size: 12.5px; color: var(--text2); margin-top: 14px; cursor: pointer; }
+  .auth-toggle strong { color: var(--green); }
+  .logout-btn {
+    width: 100%; padding: 11px; border-radius: var(--radius-sm); border: 0.5px solid var(--red-border);
+    background: var(--red-dim); color: var(--red); font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: 'DM Sans', sans-serif; margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+
+<div id="cursorGlow"></div>
+<div id="rupees-container"></div>
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div>Load ho raha hai...</div>
+</div>
+
+<div class="auth-screen" id="authScreen">
+  <h2>Arentis</h2>
+  <div class="auth-sub">Apna data cloud mein save karne ke liye login karo</div>
+  <div class="auth-card">
+    <div class="frow">
+      <label>Email</label>
+      <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email" />
+    </div>
+    <div class="frow">
+      <label>Password</label>
+      <input type="password" id="authPassword" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+    <div class="auth-error" id="authError"></div>
+    <button class="btn btn-in" style="width:100%" id="authSubmitBtn" onclick="handleAuthSubmit()">Login Karo</button>
+    <div class="auth-toggle" id="authToggleText" onclick="toggleAuthMode()">Account nahi hai? <strong>Sign Up karo</strong></div>
+  </div>
+</div>
+
+<div class="pin-screen" id="pinScreen">
+  <h2>Arentis</h2>
+  <div class="pin-sub" id="pinSub">Apna 4-digit PIN daalo</div>
+  <div class="pin-dots" id="pinDots"></div>
+  <div class="pin-error" id="pinError"></div>
+  <div class="pin-pad" id="pinPad"></div>
+  <button class="pin-skip" id="pinSkipBtn" onclick="skipPinSetup()">Abhi PIN skip karo</button>
+</div>
+
+<div class="wrapper">
+
+  <!-- ═══ Profile bar: avatar + greeting + bell ═══ -->
+  <div class="profile-bar">
+    <div class="profile-left" id="profileLeft" onclick="toggleAccountDropdown()" style="cursor:pointer">
+      <div class="profile-avatar" id="profileAvatar">M</div>
+      <div class="profile-text">
+        <span class="profile-greeting">Hello,</span>
+        <span class="profile-name" id="profileName">User</span>
+      </div>
+    </div>
+    <button class="bell-btn" id="bellBtn" onclick="toggleNotifPanel()" aria-label="Notifications">
+      🔔
+      <span class="bell-dot" id="bellDot"></span>
+    </button>
+  </div>
+
+  <div class="notif-dropdown" id="notifDropdown">
+    <div class="notif-dropdown-arrow"></div>
+    <div class="notif-dropdown-card">
+      <div class="notif-dropdown-header"><h3>🔔 Alerts</h3></div>
+      <div id="notifListBody"></div>
+    </div>
+  </div>
+
+  <div class="account-dropdown" id="accountDropdown">
+    <div class="account-dropdown-card">
+      <h3 style="font-size:14px;font-weight:600;margin-bottom:10px;color:var(--text)">🔐 App Lock (PIN)</h3>
+      <p style="font-size:11.5px;color:var(--text2);line-height:1.6;margin-bottom:10px" id="pinStatusText">PIN set nahi hai.</p>
+      <button class="btn-pdf" id="pinToggleBtn" onclick="openPinManage()">PIN Set Karo</button>
+    </div>
+    <div class="account-dropdown-card">
+      <h3 style="font-size:14px;font-weight:600;margin-bottom:10px;color:var(--text)">👤 Account</h3>
+      <p style="font-size:11.5px;color:var(--text2);line-height:1.6" id="accountEmailText">—</p>
+      <button class="logout-btn" onclick="handleLogout()">Logout Karo</button>
+    </div>
+  </div>
+
+  <div class="header">
+    <div class="header-left">
+      <h1>Arentis</h1>
+      <p>Personal Money Manager</p>
+    </div>
+    <div class="date-chip" id="dateChip"></div>
+  </div>
+
+  <div class="backup-reminder" id="backupReminder">
+    <span>⏰ Last backup 7 din se zyada purana hai. Ab backup banao.</span>
+    <button onclick="goToBackupTab()">Backup Karo</button>
+  </div>
+
+  <div class="hero-card">
+    <div class="hero-label">Total Net Balance</div>
+    <div class="hero-amount zero" id="heroAmount">₹0</div>
+    <div class="hero-sub" id="heroSub">Koi entry nahi abhi</div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card green-card">
+      <div class="stat-icon">↑</div>
+      <div class="stat-label">Aaya (Income)</div>
+      <div class="stat-value" id="totalIncome">₹0</div>
+    </div>
+    <div class="stat-card red-card">
+      <div class="stat-icon">↓</div>
+      <div class="stat-label">Gaya (Expense)</div>
+      <div class="stat-value" id="totalExpense">₹0</div>
+    </div>
+  </div>
+
+  <div class="paytm-card">
+    <div class="paytm-left">
+      <div class="paytm-icon">P</div>
+      <div class="paytm-info">
+        <div class="label">Paytm Se Gaya</div>
+        <div class="val" id="paytmTotal">₹0</div>
+      </div>
+    </div>
+    <div class="paytm-badge">Paytm Cash</div>
+  </div>
+
+  <div class="form-section active" id="tab-entry">
+    <div class="onboard-card" id="onboardCard" style="display:none">
+      <h4>👋 Swagat hai! Shuruaat aise karo:</h4>
+      <ol>
+        <li>Neeche form mein aaj ka kharch ya income daalo</li>
+        <li><strong>Entries</strong> tab mein apni list dekho</li>
+        <li><strong>Chart</strong> tab mein category-wise breakdown dekho</li>
+        <li><strong>Reports</strong> tab se roz ka PDF banao aur backup lo</li>
+      </ol>
+    </div>
+    <div class="form-card">
+      <h3>Nayi Entry Daalo</h3>
+      <div class="lock-warning" id="lockWarning">🔒 Ye tareekh PDF mai lock ho chuki hai — is din ki entry ab add nahi ho sakti.</div>
+      <div class="frow">
+        <label>Tareekh (Date)</label>
+        <input type="date" id="entryDate" onchange="checkDateLock()" />
+      </div>
+      <div class="frow">
+        <label>Vivran (Description)</label>
+        <input type="text" id="desc" placeholder="Kya kharida ya kahan se aaya?" />
+      </div>
+      <div class="frow">
+        <label>Rakam (Amount)</label>
+        <div class="amount-wrap">
+          <span>₹</span>
+          <input type="number" id="amount" placeholder="0" min="1" inputmode="decimal" />
+        </div>
+      </div>
+      <div class="frow">
+        <label>Bhugtan Tarika</label>
+        <select id="method">
+          <option value="Cash">💵 Cash</option>
+          <option value="Paytm">🔵 Paytm</option>
+          <option value="UPI">📱 UPI / GPay / PhonePe</option>
+          <option value="Bank">🏦 Bank Transfer</option>
+          <option value="Card">💳 Card</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="frow">
+        <label>Category</label>
+        <select id="category" onchange="handleCategorySelect()">
+          <option value="Khaana">🍛 Khaana / Groceries</option>
+          <option value="Transport">🚗 Transport</option>
+          <option value="Bill">💡 Bill / Recharge</option>
+          <option value="Shopping">🛍️ Shopping</option>
+          <option value="Salary">💰 Salary</option>
+          <option value="Business">📊 Business</option>
+          <option value="Medical">🏥 Medical</option>
+          <option value="Entertainment">🎬 Entertainment</option>
+          <option value="Other">📌 Other</option>
+          <option value="__add_new__">➕ Nayi Category Jodo...</option>
+        </select>
+      </div>
+      <div class="frow">
+        <label>Note (Optional)</label>
+        <input type="text" id="note" placeholder="Koi khaas baat..." />
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-in" id="btnIn" onclick="addEntry('income')">↑ Aaya (Income)</button>
+        <button class="btn btn-out" id="btnOut" onclick="addEntry('expense')">↓ Gaya (Expense)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="entries-section" id="tab-entries">
+    <div class="scope-row">
+      <select id="dateScopeSelect" onchange="onDateScopeChange()">
+        <option value="all">📅 Sab Dates</option>
+      </select>
+    </div>
+    <div class="search-row">
+      <input type="text" id="searchBox" placeholder="🔍 Vivran ya note se dhoondo..." oninput="renderList()" />
+    </div>
+    <div class="amt-range-row">
+      <input type="number" id="amtMin" placeholder="₹ Min amount" oninput="renderList()" />
+      <input type="number" id="amtMax" placeholder="₹ Max amount" oninput="renderList()" />
+    </div>
+    <div class="filter-row" id="filterRow">
+      <div class="filter-chip active" onclick="setFilter('all', this)">Sab</div>
+      <div class="filter-chip" onclick="setFilter('income', this)">Aaya</div>
+      <div class="filter-chip" onclick="setFilter('expense', this)">Gaya</div>
+      <div class="filter-chip" onclick="setFilter('Paytm', this)">Paytm</div>
+      <div class="filter-chip" onclick="setFilter('Khaana', this)">Khaana</div>
+      <div class="filter-chip" onclick="setFilter('Shopping', this)">Shopping</div>
+    </div>
+    <div class="entries-header">
+      <span id="entryCountLabel">0 entries</span>
+      <button class="clear-btn" onclick="clearAll()">Sab Saaf Karo</button>
+    </div>
+    <div id="entriesList"></div>
+  </div>
+
+  <div class="chart-section" id="tab-chart">
+    <div class="scope-row">
+      <select id="chartScopeSelect" onchange="renderChart()">
+        <option value="all">📊 Sab Dates (Total)</option>
+      </select>
+    </div>
+    <div class="chart-card">
+      <h3 id="chartHeading">Hisaab</h3>
+      <div class="bar-group">
+        <div class="bar-top">
+          <span>Income</span>
+          <strong style="color:var(--green)" id="cIncome">₹0</strong>
+        </div>
+        <div class="bar-track"><div class="bar-fill bf-green" id="bIncome" style="width:0%"></div></div>
+      </div>
+      <div class="bar-group">
+        <div class="bar-top">
+          <span>Expense</span>
+          <strong style="color:var(--red)" id="cExpense">₹0</strong>
+        </div>
+        <div class="bar-track"><div class="bar-fill bf-red" id="bExpense" style="width:0%"></div></div>
+      </div>
+      <div class="bar-group">
+        <div class="bar-top">
+          <span>Paytm Kharch</span>
+          <strong style="color:var(--paytm)" id="cPaytm">₹0</strong>
+        </div>
+        <div class="bar-track"><div class="bar-fill bf-blue" id="bPaytm" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="donut-card">
+      <div class="donut-wrap">
+        <div class="donut-ring" id="donutRing"></div>
+        <div class="donut-center">
+          <div class="donut-label">Total Kharch</div>
+          <div class="donut-value" id="donutValue">₹0</div>
+          <div class="donut-sub" id="donutSub">0 categories</div>
+        </div>
+      </div>
+      <div class="donut-legend" id="donutLegend"></div>
+    </div>
+  </div>
+
+  <div class="reports-section" id="tab-reports">
+    <div class="backup-card report-card" id="backupCard">
+      <h3 style="font-size:14px;font-weight:600;margin-bottom:12px;color:var(--text)">💾 Backup &amp; Restore</h3>
+      <div class="backup-status-grid">
+        <div class="backup-status-item">
+          <div class="lbl">Last Backup</div>
+          <div class="val" id="lastBackupVal">Never</div>
+        </div>
+        <div class="backup-status-item">
+          <div class="lbl">Total Records</div>
+          <div class="val" id="totalRecordsVal">0</div>
+        </div>
+      </div>
+      <div class="backup-btn-row">
+        <button class="btn-export" onclick="exportBackup()">⬇️ Export Backup</button>
+        <button class="btn-import" onclick="document.getElementById('importFileInput').click()">⬆️ Import Backup</button>
+      </div>
+      <button class="btn-csv" onclick="exportCSV()">📊 CSV / Excel Mein Export Karo</button>
+      <input type="file" id="importFileInput" accept="application/json,.json" onchange="handleImportFile(event)" />
+      <p style="font-size:11px;color:var(--text3);margin-top:12px;line-height:1.5">☁️ Aapka data Supabase cloud database mein securely save hota hai, sirf aap hi access kar sakte ho.</p>
+    </div>
+    <div class="report-note">💡 Har din ka PDF bana kar download karo. Ek baar PDF ban jaaye to us din ki entries lock ho jaati hain — fir naya entry ya edit us tareekh ke liye nahi ho sakta. Agar koi galti reh gayi ho to neeche "Correction Note" mein likh sakte ho.</div>
+    <div id="reportsList"></div>
+  </div>
+</div>
+
+<div class="bottom-nav">
+  <button class="nav-btn active" id="nav-entry" onclick="switchTab('entry')">
+    <span class="nav-icon">✏️</span><span class="nav-label">Entry</span>
+  </button>
+  <button class="nav-btn" id="nav-entries" onclick="switchTab('entries')">
+    <span class="nav-icon">📋</span><span class="nav-label">List</span>
+  </button>
+  <button class="nav-btn" id="nav-chart" onclick="switchTab('chart')">
+    <span class="nav-icon">📊</span><span class="nav-label">Chart</span>
+  </button>
+  <button class="nav-btn" id="nav-reports" onclick="switchTab('reports')">
+    <span class="nav-icon">📄</span><span class="nav-label">Reports</span>
+  </button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Import confirmation modal -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal-box">
+    <h3>📦 Backup File Mili</h3>
+    <div id="importInfoBody"></div>
+    <div class="modal-btn-col">
+      <button class="modal-btn merge" onclick="confirmImport('merge')">🔀 Merge Karo (Purani + Nayi entries)</button>
+      <button class="modal-btn replace" onclick="confirmImport('replace')">♻️ Replace Karo (Sab kuch is backup se badlo)</button>
+      <button class="modal-btn cancel" onclick="closeImportModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* ══════════════════ SUPABASE SETUP ══════════════════ */
+  const SUPABASE_URL = 'https://ewlptjgpoumtluuezvey.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV3bHB0amdwb3VtdGx1dWV6dmV5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcyMDc1MjIsImV4cCI6MjEwMjc4MzUyMn0.uSmARVbWrjLhC9nI5fLIPPpI5m9wC6FQVvazZ3YZVOs';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let entries = [];
+  let lockedDates = [];
+  let correctionNotes = {};
+  let customCategories = [];
+  let activeFilter = 'all';
+  let activeTab = 'entry';
+  let dateScope = 'all';
+  let chartScope = 'all';
+  let lastBackupTs = null;
+  let pendingImportData = null;
+  let savedPin = null;
+  let pinBuffer = '';
+  let pinMode = 'setup'; // 'setup' | 'confirm' | 'unlock' | 'change'
+  let pinFirstEntry = '';
+  let currentUser = null;
+  let authMode = 'login'; // 'login' | 'signup'
+  let notifOpen = false;
+  let dismissedNotifs = new Set();
+  let notifActionsMap = {};
+
+  const baseCatColors = {
+    Khaana:'#4ade80', Transport:'#60a5fa', Bill:'#fbbf24', Shopping:'#f472b6',
+    Salary:'#34d399', Business:'#a78bfa', Medical:'#f87171', Entertainment:'#fb923c', Other:'#94a3b8'
+  };
+  const baseCatEmoji = {
+    Khaana:'🍛', Transport:'🚗', Bill:'💡', Shopping:'🛍️',
+    Salary:'💰', Business:'📊', Medical:'🏥', Entertainment:'🎬', Other:'📌'
+  };
+  const customPalette = ['#22d3ee','#f97316','#c084fc','#facc15','#2dd4bf','#e879f9','#a3e635'];
+  function catColorFor(cat) {
+    if (baseCatColors[cat]) return baseCatColors[cat];
+    const idx = customCategories.indexOf(cat);
+    return customPalette[idx % customPalette.length] || '#94a3b8';
+  }
+  function catEmojiFor(cat) { return baseCatEmoji[cat] || '🏷️'; }
+
+  const dayNames = ['Ravivar','Somvar','Mangalvar','Budhvar','Guruvar','Shukravar','Shanivar'];
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  function fmt(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); }
+
+  function todayISO() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+
+  function formatDateLabel(iso) {
+    if (!iso) return 'Purani Entry';
+    const parts = iso.split('-');
+    if (parts.length !== 3) return iso;
+    const d = new Date(+parts[0], +parts[1]-1, +parts[2]);
+    if (isNaN(d.getTime())) return iso;
+    const label = dayNames[d.getDay()] + ', ' + d.getDate() + ' ' + monthNames[d.getMonth()] + ' ' + d.getFullYear();
+    if (iso === todayISO()) return 'Aaj — ' + label;
+    return label;
+  }
+
+  function isLocked(iso) { return !!iso && lockedDates.includes(iso); }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2800);
+  }
+
+  /* ══════════════════ PROFILE BAR ══════════════════ */
+
+  function updateProfileUI() {
+    if (!currentUser) return;
+    const email = currentUser.email || '';
+    const namePart = (email.split('@')[0] || 'User').replace(/[._-]+/g, ' ');
+    const displayName = namePart.replace(/\b\w/g, c => c.toUpperCase());
+    const nameEl = document.getElementById('profileName');
+    const avatarEl = document.getElementById('profileAvatar');
+    if (nameEl) nameEl.textContent = displayName || 'User';
+    if (avatarEl) avatarEl.textContent = (displayName || 'U').charAt(0).toUpperCase();
+  }
+
+  /* ══════════════════ AUTH ══════════════════ */
+
+  function toggleAuthMode() {
+    authMode = authMode === 'login' ? 'signup' : 'login';
+    document.getElementById('authSubmitBtn').textContent = authMode === 'login' ? 'Login Karo' : 'Sign Up Karo';
+    document.getElementById('authToggleText').innerHTML = authMode === 'login'
+      ? 'Account nahi hai? <strong>Sign Up karo</strong>'
+      : 'Pehle se account hai? <strong>Login karo</strong>';
+    document.getElementById('authError').textContent = '';
+  }
+
+  async function handleAuthSubmit() {
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+    const errEl = document.getElementById('authError');
+    errEl.style.color = 'var(--red)';
+    errEl.textContent = '';
+    if (!email || !password) { errEl.textContent = 'Email aur password dono zaroori hain'; return; }
+    if (password.length < 6) { errEl.textContent = 'Password kam se kam 6 characters ka ho'; return; }
+
+    const btn = document.getElementById('authSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Ruko...';
+
+    try {
+      if (authMode === 'signup') {
+        const { data, error } = await sb.auth.signUp({ email, password });
+        if (error) throw error;
+        if (data.user && !data.session) {
+          errEl.style.color = 'var(--green)';
+          errEl.textContent = '✅ Signup ho gaya! Agar email confirmation maanga jaaye to email check karo, phir login karo.';
+          btn.disabled = false;
+          btn.textContent = 'Sign Up Karo';
+          return;
+        }
+      } else {
+        const { data, error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      }
+      // onAuthStateChange listener will boot the app
+    } catch (err) {
+      errEl.style.color = 'var(--red)';
+      errEl.textContent = '❌ ' + (err.message || 'Kuch galat ho gaya, dobara try karo');
+      btn.disabled = false;
+      btn.textContent = authMode === 'login' ? 'Login Karo' : 'Sign Up Karo';
+    }
+  }
+
+  async function handleLogout() {
+    if (!confirm('Pakka logout karna hai?')) return;
+    await sb.auth.signOut();
+  }
+
+  sb.auth.onAuthStateChange((event, session) => {
+    if (session && session.user) {
+      if (!currentUser || currentUser.id !== session.user.id) {
+        currentUser = session.user;
+        document.getElementById('authScreen').classList.remove('show');
+        const be = document.getElementById('authSubmitBtn');
+        be.disabled = false;
+        be.textContent = authMode === 'login' ? 'Login Karo' : 'Sign Up Karo';
+        updateProfileUI();
+        boot();
+      }
+    } else {
+      currentUser = null;
+      document.getElementById('loadingOverlay').style.display = 'none';
+      document.getElementById('pinScreen').classList.remove('show');
+      document.getElementById('authScreen').classList.add('show');
+    }
+  });
+
+  /* ══════════════════ SUPABASE DATA LOADERS ══════════════════ */
+
+  function mapRowToEntry(r) {
+    return {
+      id: r.id, type: r.type, desc: r.description, amount: Number(r.amount),
+      method: r.method, category: r.category, note: r.note || '',
+      time: r.time_str || '', dateISO: r.date_iso,
+      date: r.date_iso ? r.date_iso.split('-').reverse().join('/') : ''
+    };
+  }
+
+  async function loadEntries() {
+    const { data, error } = await sb.from('entries').select('*')
+      .eq('user_id', currentUser.id)
+      .order('date_iso', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (error) { console.error(error); showToast('⚠️ Entries load nahi hui'); return []; }
+    return data.map(mapRowToEntry);
+  }
+
+  async function loadLockedDates() {
+    const { data, error } = await sb.from('locked_dates').select('date_iso').eq('user_id', currentUser.id);
+    if (error) { console.error(error); return []; }
+    return data.map(r => r.date_iso);
+  }
+
+  async function loadCorrectionNotes() {
+    const { data, error } = await sb.from('correction_notes').select('date_iso, note').eq('user_id', currentUser.id);
+    if (error) { console.error(error); return {}; }
+    const obj = {};
+    data.forEach(r => obj[r.date_iso] = r.note);
+    return obj;
+  }
+
+  async function loadCustomCategories() {
+    const { data, error } = await sb.from('custom_categories').select('name').eq('user_id', currentUser.id);
+    if (error) { console.error(error); return []; }
+    return data.map(r => r.name);
+  }
+
+  async function loadUserSettings() {
+    const { data, error } = await sb.from('user_settings').select('*').eq('user_id', currentUser.id).maybeSingle();
+    if (error) { console.error(error); return {}; }
+    return data || {};
+  }
+
+  async function saveUserSettings() {
+    const { error } = await sb.from('user_settings').upsert({
+      user_id: currentUser.id, pin: savedPin, last_backup_ts: lastBackupTs, updated_at: new Date().toISOString()
+    });
+    if (error) console.error(error);
+  }
+
+  /* ══════════════════ CATEGORY UI ══════════════════ */
+
+  function populateCategorySelect() {
+    const sel = document.getElementById('category');
+    const current = sel.value;
+    const addOpt = sel.querySelector('option[value="__add_new__"]');
+    customCategories.forEach(cat => {
+      if (!sel.querySelector(`option[value="${CSS.escape(cat)}"]`)) {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = catEmojiFor(cat) + ' ' + cat;
+        sel.insertBefore(opt, addOpt);
+      }
+    });
+    if (current && current !== '__add_new__') sel.value = current;
+  }
+
+  async function handleCategorySelect() {
+    const sel = document.getElementById('category');
+    if (sel.value === '__add_new__') {
+      const name = prompt('Nayi category ka naam likho:');
+      sel.value = 'Other';
+      if (name && name.trim()) {
+        const clean = name.trim().slice(0, 24);
+        if (!customCategories.includes(clean) && !baseCatColors[clean]) {
+          customCategories.push(clean);
+          const { error } = await sb.from('custom_categories').insert({ user_id: currentUser.id, name: clean });
+          if (error) console.error(error);
+        }
+        populateCategorySelect();
+        sel.value = clean;
+        showToast('✅ "' + clean + '" category jud gayi!');
+      }
+    }
+  }
+
+  /* ══════════════════ ENTRY CRUD ══════════════════ */
+
+  function setDate() {
+    const d = new Date();
+    document.getElementById('dateChip').textContent = dayNames[d.getDay()] + ', ' + d.getDate() + ' ' + monthNames[d.getMonth()];
+    const dateInput = document.getElementById('entryDate');
+    dateInput.value = todayISO();
+    dateInput.max = todayISO();
+    checkDateLock();
+  }
+
+  function checkDateLock() {
+    const iso = document.getElementById('entryDate').value;
+    const locked = isLocked(iso);
+    document.getElementById('lockWarning').classList.toggle('show', locked);
+    document.getElementById('btnIn').disabled = locked;
+    document.getElementById('btnOut').disabled = locked;
+  }
+
+  async function addEntry(type) {
+    const dateISO = document.getElementById('entryDate').value || todayISO();
+    if (isLocked(dateISO)) { showToast('🔒 Ye tareekh lock hai, entry nahi ho sakti!'); return; }
+    const desc = document.getElementById('desc').value.trim();
+    const amount = parseFloat(document.getElementById('amount').value);
+    const method = document.getElementById('method').value;
+    let category = document.getElementById('category').value;
+    if (category === '__add_new__') category = 'Other';
+    const note = document.getElementById('note').value.trim();
+    if (!desc) { showToast('⚠️ Vivran likhna zaroori hai!'); return; }
+    if (!amount || amount <= 0) { showToast('⚠️ Sahi rakam daalo!'); return; }
+
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+
+    const { data, error } = await sb.from('entries').insert({
+      user_id: currentUser.id, type, description: desc, amount, method, category, note,
+      date_iso: dateISO, time_str: timeStr
+    }).select().single();
+
+    if (error) { console.error(error); showToast('⚠️ Save nahi ho paya: ' + error.message); return; }
+
+    entries.unshift(mapRowToEntry(data));
+
+    document.getElementById('desc').value = '';
+    document.getElementById('amount').value = '';
+    document.getElementById('note').value = '';
+    populateDateScopes();
+    render();
+    showToast(type === 'income' ? '✅ Income add ho gayi!' : '✅ Expense add ho gayi!');
+  }
+
+  async function deleteEntry(id) {
+    const entry = entries.find(e => e.id === id);
+    if (!entry) return;
+    if (isLocked(entry.dateISO)) { showToast('🔒 Ye entry locked date ki hai, delete nahi ho sakti.'); return; }
+    if (!confirm('Pakka is entry ko delete karna hai?\n"' + entry.desc + '" — ' + fmt(entry.amount))) return;
+
+    const { error } = await sb.from('entries').delete().eq('id', id).eq('user_id', currentUser.id);
+    if (error) { console.error(error); showToast('⚠️ Delete nahi ho paya'); return; }
+
+    entries = entries.filter(e => e.id !== id);
+    populateDateScopes();
+    render();
+    showToast('🗑️ Entry delete ho gayi.');
+  }
+
+  async function clearAll() {
+    if (!entries.length) { showToast('Koi entry nahi hai!'); return; }
+    const unlocked = entries.filter(e => !isLocked(e.dateISO));
+    if (!unlocked.length) { showToast('🔒 Saari dates PDF mai lock hain, kuch clear nahi hoga!'); return; }
+    const lockedCount = entries.length - unlocked.length;
+    const msg = lockedCount
+      ? `Pakka ${unlocked.length} unlocked entries delete karni hain? (${lockedCount} locked entries safe rahengi)`
+      : 'Pakka sab delete karna hai?';
+    if (!confirm(msg)) return;
+
+    const ids = unlocked.map(e => e.id);
+    const { error } = await sb.from('entries').delete().in('id', ids).eq('user_id', currentUser.id);
+    if (error) { console.error(error); showToast('⚠️ Delete nahi ho paya'); return; }
+
+    entries = entries.filter(e => isLocked(e.dateISO));
+    populateDateScopes();
+    render();
+    showToast('🗑️ Unlocked entries saaf ho gayi!');
+  }
+
+  function setFilter(f, el) {
+    activeFilter = f;
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    renderList();
+  }
+
+  function onDateScopeChange() {
+    dateScope = document.getElementById('dateScopeSelect').value;
+    renderList();
+  }
+
+  function switchTab(tab) {
+    activeTab = tab;
+    document.querySelectorAll('.form-section, .entries-section, .chart-section, .reports-section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+
+    if (tab === 'entry') {
+      document.getElementById('tab-entry').classList.add('active');
+      document.getElementById('nav-entry').classList.add('active');
+      checkDateLock();
+    } else if (tab === 'entries') {
+      document.getElementById('tab-entries').classList.add('active');
+      document.getElementById('nav-entries').classList.add('active');
+      renderList();
+    } else if (tab === 'chart') {
+      document.getElementById('tab-chart').classList.add('active');
+      document.getElementById('nav-chart').classList.add('active');
+      renderChart();
+    } else {
+      document.getElementById('tab-reports').classList.add('active');
+      document.getElementById('nav-reports').classList.add('active');
+      renderReports();
+      renderBackupStatus();
+      renderPinStatus();
+      renderAccountInfo();
+    }
+  }
+
+  function goToBackupTab() { switchTab('reports'); }
+
+  let accountDropdownOpen = false;
+  function toggleAccountDropdown(forceState) {
+    accountDropdownOpen = typeof forceState === 'boolean' ? forceState : !accountDropdownOpen;
+    if (accountDropdownOpen) toggleNotifPanel(false);
+    const panel = document.getElementById('accountDropdown');
+    const left = document.getElementById('profileLeft');
+    panel.classList.toggle('show', accountDropdownOpen);
+    left.classList.toggle('open', accountDropdownOpen);
+    if (accountDropdownOpen) {
+      renderPinStatus();
+      renderAccountInfo();
+    }
+  }
+
+  function toggleNotifPanel(forceState) {
+    notifOpen = typeof forceState === 'boolean' ? forceState : !notifOpen;
+    if (notifOpen) toggleAccountDropdown(false);
+    const panel = document.getElementById('notifDropdown');
+    panel.classList.toggle('show', notifOpen);
+    if (notifOpen) renderNotifPanel();
+  }
+
+  document.addEventListener('click', function(e) {
+    const accPanel = document.getElementById('accountDropdown');
+    const accLeft = document.getElementById('profileLeft');
+    if (accountDropdownOpen && !accPanel.contains(e.target) && !accLeft.contains(e.target)) {
+      toggleAccountDropdown(false);
+    }
+    const notifPanel = document.getElementById('notifDropdown');
+    const bell = document.getElementById('bellBtn');
+    if (notifOpen && !notifPanel.contains(e.target) && !bell.contains(e.target)) {
+      toggleNotifPanel(false);
+    }
+  });
+
+  /* ══════════════════ NOTIFICATIONS ══════════════════ */
+
+  function buildNotifications() {
+    const list = [];
+    notifActionsMap = {};
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+    const overdueBackup = entries.length && (!lastBackupTs || (Date.now() - lastBackupTs) > sevenDays);
+    if (overdueBackup) {
+      list.push({
+        id: 'backup', icon: '💾', title: 'Backup purana hai',
+        desc: lastBackupTs ? ('Last backup: ' + new Date(lastBackupTs).toLocaleDateString('en-IN')) : 'Abhi tak koi backup nahi liya gaya',
+        actionLabel: 'Backup Karo'
+      });
+      notifActionsMap['backup'] = () => { toggleNotifPanel(false); switchTab('reports'); };
+    }
+    const today = todayISO();
+    const unlockedOld = getAllDates().filter(d => d !== today && !isLocked(d));
+    if (unlockedOld.length) {
+      list.push({
+        id: 'unlocked', icon: '🔓', title: unlockedOld.length + ' purane din lock nahi hue',
+        desc: 'PDF banake apne purane din ke reports lock karo',
+        actionLabel: 'Reports Dekho'
+      });
+      notifActionsMap['unlocked'] = () => { toggleNotifPanel(false); switchTab('reports'); };
+    }
+    const todayEntries = entries.filter(e => e.dateISO === today);
+    if (!todayEntries.length) {
+      list.push({
+        id: 'noentrytoday', icon: '📝', title: 'Aaj ki koi entry nahi hai',
+        desc: 'Aaj ka kharch ya income record karo',
+        actionLabel: 'Entry Daalo'
+      });
+      notifActionsMap['noentrytoday'] = () => { toggleNotifPanel(false); switchTab('entry'); };
+    }
+    return list.filter(n => !dismissedNotifs.has(n.id));
+  }
+
+  function updateNotifBadge() {
+    const list = buildNotifications();
+    const dot = document.getElementById('bellDot');
+    if (list.length) {
+      dot.style.display = 'flex';
+      dot.textContent = list.length > 9 ? '9+' : String(list.length);
+    } else {
+      dot.style.display = 'none';
+      dot.textContent = '';
+    }
+  }
+
+  function renderNotifPanel() {
+    const body = document.getElementById('notifListBody');
+    const list = buildNotifications();
+    if (!list.length) {
+      body.innerHTML = '<div class="notif-empty">🎉 Koi naya alert nahi hai</div>';
+      return;
+    }
+    body.innerHTML = list.map(n => `
+      <div class="notif-item">
+        <div class="notif-icon">${n.icon}</div>
+        <div class="notif-body">
+          <div class="notif-title">${n.title}</div>
+          <div class="notif-desc">${n.desc}</div>
+          <button class="notif-action" onclick="handleNotifAction('${n.id}')">${n.actionLabel}</button>
+        </div>
+        <button class="notif-dismiss" onclick="dismissNotif('${n.id}')" title="Dismiss">✕</button>
+      </div>
+    `).join('');
+  }
+
+  function handleNotifAction(id) {
+    if (notifActionsMap[id]) notifActionsMap[id]();
+  }
+
+  function dismissNotif(id) {
+    dismissedNotifs.add(id);
+    refreshNotifications();
+    showToast('Alert hata diya');
+  }
+
+  function refreshNotifications() {
+    updateNotifBadge();
+    if (notifOpen) renderNotifPanel();
+  }
+
+  function openAccountSettings() {
+    switchTab('reports');
+    setTimeout(() => {
+      const el = document.getElementById('pinSettingsCard');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  }
+
+  function renderAccountInfo() {
+    const el = document.getElementById('accountEmailText');
+    if (el && currentUser) el.textContent = '📧 Logged in as: ' + currentUser.email;
+  }
+
+  function getAllDates() {
+    const set = new Set(entries.map(e => e.dateISO).filter(Boolean));
+    return Array.from(set).sort().reverse();
+  }
+
+  function populateDateScopes() {
+    const dates = getAllDates();
+    const sel1 = document.getElementById('dateScopeSelect');
+    const sel2 = document.getElementById('chartScopeSelect');
+    const prev1 = sel1.value, prev2 = sel2.value;
+    sel1.innerHTML = '<option value="all">📅 Sab Dates</option>' +
+      dates.map(d => `<option value="${d}">${formatDateLabel(d)}${isLocked(d) ? ' 🔒' : ''}</option>`).join('');
+    sel2.innerHTML = '<option value="all">📊 Sab Dates (Total)</option>' +
+      dates.map(d => `<option value="${d}">${formatDateLabel(d)}${isLocked(d) ? ' 🔒' : ''}</option>`).join('');
+    if (dates.includes(prev1) || prev1 === 'all') sel1.value = prev1; else sel1.value = 'all';
+    if (dates.includes(prev2) || prev2 === 'all') sel2.value = prev2; else sel2.value = 'all';
+    dateScope = sel1.value;
+    chartScope = sel2.value;
+  }
+
+  function renderList() {
+    let filtered = entries;
+    if (dateScope !== 'all') filtered = filtered.filter(e => e.dateISO === dateScope);
+    if (activeFilter === 'income') filtered = filtered.filter(e => e.type === 'income');
+    else if (activeFilter === 'expense') filtered = filtered.filter(e => e.type === 'expense');
+    else if (activeFilter === 'Paytm') filtered = filtered.filter(e => e.method === 'Paytm');
+    else if (activeFilter !== 'all') filtered = filtered.filter(e => e.category === activeFilter);
+
+    const searchTerm = (document.getElementById('searchBox')?.value || '').trim().toLowerCase();
+    if (searchTerm) {
+      filtered = filtered.filter(e =>
+        (e.desc || '').toLowerCase().includes(searchTerm) ||
+        (e.note || '').toLowerCase().includes(searchTerm)
+      );
+    }
+    const minV = parseFloat(document.getElementById('amtMin')?.value);
+    const maxV = parseFloat(document.getElementById('amtMax')?.value);
+    if (!isNaN(minV)) filtered = filtered.filter(e => e.amount >= minV);
+    if (!isNaN(maxV)) filtered = filtered.filter(e => e.amount <= maxV);
+
+    const list = document.getElementById('entriesList');
+    document.getElementById('entryCountLabel').textContent = filtered.length + ' entr' + (filtered.length === 1 ? 'y' : 'ies');
+
+    if (!filtered.length) {
+      list.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>Is filter mein koi entry nahi</p></div>';
+      return;
+    }
+
+    const groups = {};
+    filtered.forEach(e => {
+      const key = e.dateISO || 'unknown';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(e);
+    });
+    const orderedKeys = Object.keys(groups).sort().reverse();
+
+    list.innerHTML = orderedKeys.map(key => {
+      const items = groups[key];
+      let inc = 0, exp = 0;
+      items.forEach(e => e.type === 'income' ? inc += e.amount : exp += e.amount);
+      const locked = isLocked(key);
+      return `
+        <div class="day-group">
+          <div class="day-group-header">
+            <div class="day-group-title">${formatDateLabel(key)} ${locked ? '<span class="day-lock-tag">🔒 Locked</span>' : ''}</div>
+            <div class="day-group-sub">+${fmt(inc)} / -${fmt(exp)}</div>
+          </div>
+          ${items.map(e => `
+            <div class="entry-item">
+              <div class="entry-dot ${e.type === 'income' ? 'dot-in' : 'dot-out'}">${catEmojiFor(e.category)}</div>
+              <div class="entry-body">
+                <div class="entry-desc">${e.desc}</div>
+                <div class="entry-meta">
+                  <span>${e.time}</span>
+                  <span class="entry-tag">${e.category}</span>
+                  <span class="entry-tag${e.method === 'Paytm' ? ' paytm-tag' : ''}">${e.method}</span>
+                  ${e.note ? '<span class="entry-tag">' + e.note + '</span>' : ''}
+                </div>
+              </div>
+              <div class="entry-amount ${e.type === 'income' ? 'amt-in' : 'amt-out'}">${e.type === 'income' ? '+' : '-'}${fmt(e.amount)}</div>
+              ${locked ? '' : `<button class="entry-del" onclick="deleteEntry('${e.id}')" title="Delete">✕</button>`}
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }).join('');
+  }
+
+  function renderChart() {
+    chartScope = document.getElementById('chartScopeSelect').value;
+    const scoped = chartScope === 'all' ? entries : entries.filter(e => e.dateISO === chartScope);
+    document.getElementById('chartHeading').textContent = chartScope === 'all' ? 'Sab Dates Ka Hisaab' : formatDateLabel(chartScope) + ' Ka Hisaab';
+
+    let income = 0, expense = 0, paytm = 0;
+    const catMap = {};
+    scoped.forEach(e => {
+      if (e.type === 'income') income += e.amount;
+      else { expense += e.amount; catMap[e.category] = (catMap[e.category] || 0) + e.amount; }
+      if (e.method === 'Paytm') paytm += e.amount;
+    });
+    const max = Math.max(income, expense, paytm, 1);
+    document.getElementById('cIncome').textContent = fmt(income);
+    document.getElementById('cExpense').textContent = fmt(expense);
+    document.getElementById('cPaytm').textContent = fmt(paytm);
+    document.getElementById('bIncome').style.width = Math.round(income / max * 100) + '%';
+    document.getElementById('bExpense').style.width = Math.round(expense / max * 100) + '%';
+    document.getElementById('bPaytm').style.width = Math.round(paytm / max * 100) + '%';
+
+    const cats = Object.entries(catMap).sort((a,b) => b[1]-a[1]);
+    renderDonutChart(cats, expense);
+  }
+
+  function renderDonutChart(cats, totalExpense) {
+    const ring = document.getElementById('donutRing');
+    const legend = document.getElementById('donutLegend');
+    const valueEl = document.getElementById('donutValue');
+    const subEl = document.getElementById('donutSub');
+
+    valueEl.textContent = fmt(totalExpense);
+    subEl.textContent = cats.length + (cats.length === 1 ? ' category' : ' categories');
+
+    if (!cats.length || totalExpense <= 0) {
+      ring.style.background = 'var(--surface2)';
+      legend.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:var(--text3);font-size:12px;padding:6px 0">Koi expense nahi</p>';
+      return;
+    }
+
+    const gapDeg = 3;
+    let angle = 0;
+    const stops = [];
+    cats.forEach(([cat, val]) => {
+      const deg = (val / totalExpense) * 360;
+      const start = angle;
+      const segEnd = Math.max(start, angle + deg - gapDeg);
+      const fullEnd = angle + deg;
+      stops.push(`${catColorFor(cat)} ${start}deg ${segEnd}deg`);
+      stops.push(`transparent ${segEnd}deg ${fullEnd}deg`);
+      angle = fullEnd;
+    });
+    ring.style.background = `conic-gradient(${stops.join(',')})`;
+
+    legend.innerHTML = cats.map(([cat, val]) => `
+      <div class="donut-legend-item">
+        <span class="donut-legend-dot" style="background:${catColorFor(cat)}"></span>
+        <span>${catEmojiFor(cat)} ${cat} — ${Math.round(val / totalExpense * 100)}%</span>
+      </div>
+    `).join('');
+  }
+
+  function renderReports() {
+    const dates = getAllDates();
+    const list = document.getElementById('reportsList');
+    if (!dates.length) {
+      list.innerHTML = '<div class="empty-state"><div class="icon">📄</div><p>Abhi koi entry nahi, PDF banane ke liye pehle entry daalo</p></div>';
+      return;
+    }
+    list.innerHTML = dates.map(iso => {
+      const items = entries.filter(e => e.dateISO === iso);
+      let inc = 0, exp = 0;
+      items.forEach(e => e.type === 'income' ? inc += e.amount : exp += e.amount);
+      const locked = isLocked(iso);
+      const existingNote = correctionNotes[iso];
+      const correctionHtml = locked ? `
+        <div class="correction-note-wrap">
+          ${existingNote ? `<div class="existing-note">📝 <strong>Correction Note:</strong> ${existingNote}</div>` : ''}
+          <span class="note-label" style="margin-top:8px">${existingNote ? 'Note update karo' : 'Galti hui? Correction note likho'}</span>
+          <textarea id="cnote-${iso}" placeholder="Jaise: 'Entry ₹500 ki jagah ₹50 honi chahiye thi'"></textarea>
+          <button class="note-save" onclick="saveCorrectionNote('${iso}')">💾 Note Save Karo</button>
+        </div>` : '';
+      return `
+        <div class="report-card">
+          <div class="report-top">
+            <div>
+              <div class="report-date">${formatDateLabel(iso)}</div>
+              <div class="report-count">${items.length} entr${items.length === 1 ? 'y' : 'ies'}</div>
+            </div>
+            <span class="lock-badge ${locked ? 'locked' : 'open'}">${locked ? '🔒 Locked' : '🔓 Open'}</span>
+          </div>
+          <div class="report-nums">
+            <div class="report-num-block in"><div class="lbl">Aaya</div><div class="val">${fmt(inc)}</div></div>
+            <div class="report-num-block out"><div class="lbl">Gaya</div><div class="val">${fmt(exp)}</div></div>
+            <div class="report-num-block net"><div class="lbl">Net</div><div class="val">${fmt(inc-exp)}</div></div>
+          </div>
+          <button class="btn-pdf ${locked ? '' : 'primary'}" onclick="generatePDF('${iso}')">${locked ? '⬇️ PDF Dobara Download' : '📄 PDF Banao & Lock Karo'}</button>
+          ${correctionHtml}
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function saveCorrectionNote(iso) {
+    const ta = document.getElementById('cnote-' + iso);
+    const val = ta ? ta.value.trim() : '';
+    if (!val) { showToast('⚠️ Pehle note likho'); return; }
+
+    const { error } = await sb.from('correction_notes').upsert({
+      user_id: currentUser.id, date_iso: iso, note: val, updated_at: new Date().toISOString()
+    });
+    if (error) { console.error(error); showToast('⚠️ Save nahi hua'); return; }
+
+    correctionNotes[iso] = val;
+    renderReports();
+    showToast('✅ Correction note save ho gaya');
+  }
+
+  async function generatePDF(iso) {
+    const items = entries.filter(e => e.dateISO === iso).slice().reverse();
+    if (!items.length) { showToast('Is date ki koi entry nahi mili'); return; }
+    if (typeof window.jspdf === 'undefined') { showToast('⚠️ PDF library load nahi hui, internet check karo'); return; }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    let y = 18;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text('Arentis - Daily Report', 14, y);
+    y += 8;
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text(formatDateLabel(iso).replace(/[^\x00-\x7F]/g, ''), 14, y);
+    y += 10;
+
+    doc.setDrawColor(200);
+    doc.line(14, y, 196, y);
+    y += 8;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('Time', 14, y);
+    doc.text('Description', 34, y);
+    doc.text('Category', 104, y);
+    doc.text('Method', 140, y);
+    doc.text('Amount', 196, y, { align: 'right' });
+    y += 5;
+    doc.line(14, y, 196, y);
+    y += 6;
+
+    doc.setFont('helvetica', 'normal');
+    let inc = 0, exp = 0;
+    items.forEach(e => {
+      if (y > 275) { doc.addPage(); y = 18; }
+      if (e.type === 'income') inc += e.amount; else exp += e.amount;
+      doc.text(String(e.time || ''), 14, y);
+      doc.text(String(e.desc || '').slice(0, 32), 34, y);
+      doc.text(String(e.category || ''), 104, y);
+      doc.text(String(e.method || ''), 140, y);
+      doc.text((e.type === 'income' ? '+' : '-') + fmt(e.amount).replace('₹',''), 196, y, { align: 'right' });
+      y += 7;
+    });
+
+    y += 4;
+    doc.line(14, y, 196, y);
+    y += 8;
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total Aaya: Rs ' + Math.round(inc).toLocaleString('en-IN'), 14, y);
+    y += 7;
+    doc.text('Total Gaya: Rs ' + Math.round(exp).toLocaleString('en-IN'), 14, y);
+    y += 7;
+    doc.text('Net Balance: Rs ' + Math.round(inc - exp).toLocaleString('en-IN'), 14, y);
+
+    if (correctionNotes[iso]) {
+      y += 12;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('Correction Note:', 14, y);
+      y += 6;
+      doc.setFont('helvetica', 'normal');
+      const lines = doc.splitTextToSize(correctionNotes[iso], 180);
+      doc.text(lines, 14, y);
+    }
+
+    doc.save('Arentis_' + iso + '.pdf');
+
+    if (!isLocked(iso)) {
+      const { error } = await sb.from('locked_dates').insert({ user_id: currentUser.id, date_iso: iso });
+      if (error) { console.error(error); showToast('⚠️ Lock save nahi hua, lekin PDF ban gaya'); }
+      else { lockedDates.push(iso); }
+      populateDateScopes();
+      checkDateLock();
+      showToast('✅ PDF ban gaya! Ye din ab lock ho gaya hai.');
+    } else {
+      showToast('✅ PDF dobara download ho gaya.');
+    }
+    renderReports();
+    if (activeTab === 'entries') renderList();
+    refreshNotifications();
+  }
+
+  function render() {
+    let income = 0, expense = 0, paytm = 0;
+    entries.forEach(e => {
+      if (e.type === 'income') income += e.amount;
+      else expense += e.amount;
+      if (e.method === 'Paytm') paytm += e.amount;
+    });
+    const net = income - expense;
+    const heroEl = document.getElementById('heroAmount');
+    if (net > 0) heroEl.textContent = '+' + fmt(net);
+    else if (net < 0) heroEl.textContent = '-' + fmt(Math.abs(net));
+    else heroEl.textContent = '₹0';
+    heroEl.className = 'hero-amount ' + (net > 0 ? 'positive' : net < 0 ? 'negative' : 'zero');
+
+    document.getElementById('heroSub').textContent = entries.length
+      ? `${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} • ${getAllDates().length} din`
+      : 'Koi entry nahi abhi';
+    document.getElementById('totalIncome').textContent = fmt(income);
+    document.getElementById('totalExpense').textContent = fmt(expense);
+    document.getElementById('paytmTotal').textContent = fmt(paytm);
+
+    document.getElementById('onboardCard').style.display = entries.length ? 'none' : 'block';
+
+    if (activeTab === 'entries') renderList();
+    if (activeTab === 'chart') renderChart();
+    if (activeTab === 'reports') { renderReports(); renderBackupStatus(); renderPinStatus(); renderAccountInfo(); }
+    checkBackupReminder();
+  }
+
+  /* ══════════════════ BACKUP & RESTORE ══════════════════ */
+
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  function backupFileTimestamp(d) {
+    return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()) + '_' +
+           pad2(d.getHours()) + '-' + pad2(d.getMinutes()) + '-' + pad2(d.getSeconds());
+  }
+
+  function buildBackupObject() {
+    return {
+      appName: 'Arentis',
+      backupVersion: 2,
+      createdAt: new Date().toISOString(),
+      data: {
+        transactions: entries,
+        lockedDates: lockedDates,
+        correctionNotes: correctionNotes,
+        customCategories: customCategories,
+        settings: {}
+      }
+    };
+  }
+
+  function downloadJSON(obj, filename) {
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function csvEscape(val) {
+    const s = String(val === undefined || val === null ? '' : val);
+    if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+
+  function exportCSV() {
+    if (!entries.length) { showToast('Koi entries nahi hain export karne ke liye'); return; }
+    const header = ['Date','Time','Type','Description','Category','Method','Amount','Note'];
+    const rows = entries.slice().sort((a,b) => (a.dateISO||'').localeCompare(b.dateISO||'')).map(e => [
+      e.date || e.dateISO || '', e.time || '', e.type === 'income' ? 'Income' : 'Expense',
+      e.desc || '', e.category || '', e.method || '', e.amount, e.note || ''
+    ]);
+    const csv = [header, ...rows].map(r => r.map(csvEscape).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Arentis_' + backupFileTimestamp(new Date()) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast('✅ CSV export ho gaya!');
+  }
+
+  async function exportBackup() {
+    try {
+      const backup = buildBackupObject();
+      const now = new Date();
+      downloadJSON(backup, 'Arentis_Backup_' + backupFileTimestamp(now) + '.json');
+      lastBackupTs = now.getTime();
+      await saveUserSettings();
+      renderBackupStatus();
+      checkBackupReminder();
+      showToast('✅ Backup download ho gaya!');
+    } catch (err) {
+      console.error(err);
+      showToast('⚠️ Backup banane mein error aayi');
+    }
+  }
+
+  function validateBackupShape(obj) {
+    if (!obj || typeof obj !== 'object') return 'Invalid backup file.';
+    if (obj.appName !== 'Arentis') return 'This file is not a valid Arentis backup.';
+    if (!obj.data || typeof obj.data !== 'object') return 'This file is not a valid Arentis backup.';
+    if (!Array.isArray(obj.data.transactions)) return 'This file is not a valid Arentis backup.';
+    if (!obj.data.transactions.length) return 'Backup file khaali hai, koi records nahi mile.';
+    for (const t of obj.data.transactions) {
+      if (typeof t !== 'object' || !('amount' in t) || !('type' in t)) {
+        return 'Backup mein kuch records ki jaankari missing hai.';
+      }
+    }
+    return null;
+  }
+
+  function handleImportFile(event) {
+    const file = event.target.files[0];
+    event.target.value = '';
+    if (!file) return;
+    if (file.size > 20 * 1024 * 1024) { showToast('⚠️ File bahut badi hai (max 20MB).'); return; }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      let parsed;
+      try {
+        parsed = JSON.parse(e.target.result);
+      } catch (err) {
+        showToast('❌ Invalid backup file.');
+        return;
+      }
+      const error = validateBackupShape(parsed);
+      if (error) { showToast('❌ ' + error); return; }
+      pendingImportData = parsed;
+      openImportModal(parsed);
+    };
+    reader.onerror = () => showToast('❌ File padhne mein error aayi.');
+    reader.readAsText(file);
+  }
+
+  function openImportModal(backup) {
+    const txns = backup.data.transactions;
+    const dates = txns.map(t => t.dateISO || t.date_iso).filter(Boolean).sort();
+    const dateRange = dates.length ? formatDateLabel(dates[0]) + ' — ' + formatDateLabel(dates[dates.length-1]) : 'N/A';
+    const createdAt = backup.createdAt ? new Date(backup.createdAt).toLocaleString('en-IN') : 'Unknown';
+
+    document.getElementById('importInfoBody').innerHTML = `
+      <p>Ye backup file aapke current data ko badal sakti hai. Neeche backup ki jaankari dekho aur mode chuno:</p>
+      <div class="modal-info-row"><span>Backup Date</span><span>${createdAt}</span></div>
+      <div class="modal-info-row"><span>Total Records</span><span>${txns.length}</span></div>
+      <div class="modal-info-row"><span>Date Range</span><span>${dateRange}</span></div>
+      <div class="modal-info-row"><span>Aapke Current Records</span><span>${entries.length}</span></div>
+    `;
+    document.getElementById('importModal').classList.add('show');
+  }
+
+  function closeImportModal() {
+    document.getElementById('importModal').classList.remove('show');
+    pendingImportData = null;
+  }
+
+  async function confirmImport(mode) {
+    if (!pendingImportData) { closeImportModal(); return; }
+    const backup = pendingImportData;
+    const incoming = backup.data.transactions;
+    const incomingLocked = Array.isArray(backup.data.lockedDates) ? backup.data.lockedDates : [];
+    const incomingNotes = backup.data.correctionNotes && typeof backup.data.correctionNotes === 'object' ? backup.data.correctionNotes : {};
+    const incomingCats = Array.isArray(backup.data.customCategories) ? backup.data.customCategories : [];
+
+    if (mode === 'replace') {
+      const sure = confirm('Aapka current data is backup se REPLACE ho jaayega.\nEk safety backup pehle download hogi.\n\nContinue karein?');
+      if (!sure) return;
+      const safety = buildBackupObject();
+      downloadJSON(safety, 'Arentis_SafetyBackup_' + backupFileTimestamp(new Date()) + '.json');
+
+      await sb.from('entries').delete().eq('user_id', currentUser.id);
+      await sb.from('locked_dates').delete().eq('user_id', currentUser.id);
+      await sb.from('correction_notes').delete().eq('user_id', currentUser.id);
+      await sb.from('custom_categories').delete().eq('user_id', currentUser.id);
+
+      const rows = incoming.filter(t => (t.dateISO || t.date_iso)).map(t => ({
+        user_id: currentUser.id, type: t.type,
+        description: t.desc || t.description || '',
+        amount: t.amount, method: t.method || 'Other', category: t.category || 'Other',
+        note: t.note || '', date_iso: t.dateISO || t.date_iso, time_str: t.time || t.time_str || ''
+      }));
+      if (rows.length) await sb.from('entries').insert(rows);
+      if (incomingLocked.length) await sb.from('locked_dates').insert(incomingLocked.map(d => ({ user_id: currentUser.id, date_iso: d })));
+      const noteRows = Object.entries(incomingNotes).map(([d, n]) => ({ user_id: currentUser.id, date_iso: d, note: n }));
+      if (noteRows.length) await sb.from('correction_notes').insert(noteRows);
+      if (incomingCats.length) await sb.from('custom_categories').insert(incomingCats.map(c => ({ user_id: currentUser.id, name: c })));
+
+      entries = await loadEntries();
+      lockedDates = await loadLockedDates();
+      correctionNotes = await loadCorrectionNotes();
+      customCategories = await loadCustomCategories();
+      populateDateScopes();
+      populateCategorySelect();
+      render();
+      closeImportModal();
+      showToast('✅ Backup restored successfully.');
+    } else {
+      const existingKeys = new Set(entries.map(e => `${e.dateISO}|${e.desc}|${e.amount}|${e.type}|${e.time}`));
+      const newRows = [];
+      incoming.forEach(t => {
+        const dateISO = t.dateISO || t.date_iso;
+        if (!dateISO) return;
+        const desc = t.desc || t.description || '';
+        const key = `${dateISO}|${desc}|${t.amount}|${t.type}|${t.time || t.time_str || ''}`;
+        if (!existingKeys.has(key)) {
+          existingKeys.add(key);
+          newRows.push({
+            user_id: currentUser.id, type: t.type, description: desc, amount: t.amount,
+            method: t.method || 'Other', category: t.category || 'Other', note: t.note || '',
+            date_iso: dateISO, time_str: t.time || t.time_str || ''
+          });
+        }
+      });
+      let added = 0;
+      if (newRows.length) {
+        const { data, error } = await sb.from('entries').insert(newRows).select();
+        if (!error && data) added = data.length;
+        else if (error) console.error(error);
+      }
+      const newLocked = incomingLocked.filter(d => !lockedDates.includes(d));
+      if (newLocked.length) await sb.from('locked_dates').insert(newLocked.map(d => ({ user_id: currentUser.id, date_iso: d })));
+      const newNoteRows = Object.entries(incomingNotes).filter(([d]) => !correctionNotes[d]).map(([d, n]) => ({ user_id: currentUser.id, date_iso: d, note: n }));
+      if (newNoteRows.length) await sb.from('correction_notes').insert(newNoteRows);
+      const newCats = incomingCats.filter(c => !customCategories.includes(c));
+      if (newCats.length) await sb.from('custom_categories').insert(newCats.map(c => ({ user_id: currentUser.id, name: c })));
+
+      entries = await loadEntries();
+      lockedDates = await loadLockedDates();
+      correctionNotes = await loadCorrectionNotes();
+      customCategories = await loadCustomCategories();
+      populateDateScopes();
+      populateCategorySelect();
+      render();
+      closeImportModal();
+      if (added > 0) showToast(`✅ Backup imported successfully. ${added} new records were added.`);
+      else showToast('ℹ️ No duplicate records were added.');
+    }
+  }
+
+  function renderBackupStatus() {
+    document.getElementById('totalRecordsVal').textContent = entries.length;
+    const el = document.getElementById('lastBackupVal');
+    if (!lastBackupTs) {
+      el.textContent = 'Never';
+    } else {
+      el.textContent = new Date(lastBackupTs).toLocaleString('en-IN', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+    }
+  }
+
+  function checkBackupReminder() {
+    const banner = document.getElementById('backupReminder');
+    if (!entries.length) {
+      banner.classList.remove('show');
+    } else {
+      const sevenDays = 7 * 24 * 60 * 60 * 1000;
+      const overdue = !lastBackupTs || (Date.now() - lastBackupTs) > sevenDays;
+      banner.classList.toggle('show', overdue);
+    }
+    refreshNotifications();
+  }
+
+  /* ══════════════════ PIN LOCK ══════════════════ */
+
+  function renderPinStatus() {
+    const txt = document.getElementById('pinStatusText');
+    const btn = document.getElementById('pinToggleBtn');
+    if (savedPin) {
+      txt.textContent = '🔐 PIN set hai — app kholte hi PIN maanga jaayega.';
+      btn.textContent = 'PIN Badlo ya Hatao';
+    } else {
+      txt.textContent = 'PIN set nahi hai — koi bhi is app ko khol sakta hai.';
+      btn.textContent = 'PIN Set Karo';
+    }
+  }
+
+  function openPinManage() {
+    if (!savedPin) {
+      startPinFlow('setup');
+    } else {
+      const choice = confirm('OK dabao PIN badalne ke liye, Cancel dabao PIN hatane ke liye.');
+      if (choice) startPinFlow('change');
+      else removePinDirect();
+    }
+  }
+
+  async function removePinDirect() {
+    if (!confirm('Pakka PIN hatana hai? App bina lock ke khulega.')) return;
+    savedPin = null;
+    await saveUserSettings();
+    renderPinStatus();
+    showToast('🔓 PIN hata diya gaya.');
+  }
+
+  function startPinFlow(mode) {
+    pinMode = mode;
+    pinBuffer = '';
+    pinFirstEntry = '';
+    document.getElementById('pinError').textContent = '';
+    document.getElementById('pinSkipBtn').style.display = (mode === 'unlock') ? 'none' : 'inline-block';
+    document.getElementById('pinSub').textContent =
+      mode === 'unlock' ? 'App unlock karne ke liye PIN daalo' : 'Naya 4-digit PIN banao';
+    buildPinPad();
+    renderPinDots();
+    document.getElementById('pinScreen').classList.add('show');
+  }
+
+  function skipPinSetup() {
+    document.getElementById('pinScreen').classList.remove('show');
+  }
+
+  function buildPinPad() {
+    const pad = document.getElementById('pinPad');
+    const keys = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
+    pad.innerHTML = keys.map(k => {
+      if (k === '') return '<div class="pin-key ghost"></div>';
+      if (k === '⌫') return `<button class="pin-key" onclick="pinBackspace()">⌫</button>`;
+      return `<button class="pin-key" onclick="pinPress('${k}')">${k}</button>`;
+    }).join('');
+  }
+
+  function renderPinDots() {
+    const dots = document.getElementById('pinDots');
+    dots.innerHTML = [0,1,2,3].map(i => `<div class="pin-dot ${i < pinBuffer.length ? 'filled' : ''}"></div>`).join('');
+  }
+
+  function pinBackspace() {
+    pinBuffer = pinBuffer.slice(0, -1);
+    renderPinDots();
+    document.getElementById('pinError').textContent = '';
+  }
+
+  async function pinPress(digit) {
+    if (pinBuffer.length >= 4) return;
+    pinBuffer += digit;
+    renderPinDots();
+    if (pinBuffer.length === 4) {
+      setTimeout(() => handlePinComplete(), 150);
+    }
+  }
+
+  async function handlePinComplete() {
+    if (pinMode === 'unlock') {
+      if (pinBuffer === savedPin) {
+        document.getElementById('pinScreen').classList.remove('show');
+      } else {
+        document.getElementById('pinError').textContent = '❌ Galat PIN, dobara try karo';
+        pinBuffer = '';
+        renderPinDots();
+      }
+      return;
+    }
+    if (!pinFirstEntry) {
+      pinFirstEntry = pinBuffer;
+      pinBuffer = '';
+      renderPinDots();
+      document.getElementById('pinSub').textContent = 'PIN dobara confirm karo';
+      return;
+    }
+    if (pinBuffer === pinFirstEntry) {
+      savedPin = pinBuffer;
+      await saveUserSettings();
+      document.getElementById('pinScreen').classList.remove('show');
+      renderPinStatus();
+      showToast('✅ PIN set ho gaya!');
+    } else {
+      document.getElementById('pinError').textContent = '❌ PIN match nahi hua, dobara try karo';
+      pinFirstEntry = '';
+      pinBuffer = '';
+      renderPinDots();
+      document.getElementById('pinSub').textContent = 'Naya 4-digit PIN banao';
+    }
+  }
+
+  /* ══════════════════ BOOT / INIT ══════════════════ */
+
+  async function boot() {
+    document.getElementById('loadingOverlay').style.display = 'flex';
+    try {
+      entries = await loadEntries();
+      lockedDates = await loadLockedDates();
+      correctionNotes = await loadCorrectionNotes();
+      customCategories = await loadCustomCategories();
+      const settings = await loadUserSettings();
+      savedPin = settings.pin || null;
+      lastBackupTs = settings.last_backup_ts || null;
+
+      setDate();
+      populateDateScopes();
+      populateCategorySelect();
+      updateProfileUI();
+      render();
+      checkBackupReminder();
+    } catch (err) {
+      console.error(err);
+      showToast('⚠️ Data load karne mein dikkat aayi');
+    }
+    document.getElementById('loadingOverlay').style.display = 'none';
+
+    if (savedPin) startPinFlow('unlock');
+  }
+
+  (async function start() {
+    const { data } = await sb.auth.getSession();
+    const session = data?.session;
+    if (session && session.user) {
+      currentUser = session.user;
+      updateProfileUI();
+      boot();
+    } else {
+      document.getElementById('loadingOverlay').style.display = 'none';
+      document.getElementById('authScreen').classList.add('show');
+    }
+  })();
+
+  function createRupee() {
+    const el = document.createElement('div');
+    el.className = 'rupee-float';
+    el.textContent = '₹';
+    el.style.left = Math.random() * 100 + 'vw';
+    el.style.fontSize = (Math.random() * 24 + 16) + 'px';
+    const duration = Math.random() * 6 + 6;
+    el.style.animationDuration = duration + 's';
+    el.style.opacity = Math.random() * 0.4 + 0.1;
+    document.getElementById('rupees-container').appendChild(el);
+    setTimeout(() => el.remove(), duration * 1000);
+  }
+  setInterval(createRupee, 800);
+
+  const glow = document.getElementById('cursorGlow');
+  document.addEventListener('mousemove', (e) => {
+    glow.style.left = e.clientX + 'px';
+    glow.style.top = e.clientY + 'px';
+  });
+
+  document.addEventListener('mousedown', () => {
+    glow.style.background = 'radial-gradient(circle, rgba(0, 186, 242, 0.08) 0%, transparent 60%)';
+  });
+  document.addEventListener('mouseup', () => {
+    glow.style.background = 'radial-gradient(circle, rgba(74, 222, 128, 0.05) 0%, transparent 60%)';
+  });
+</script>
+</body>
+</html>
