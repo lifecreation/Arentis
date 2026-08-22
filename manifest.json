@@ -2,7 +2,7 @@
   "name": "Arentis",
   "short_name": "Arentis",
   "id": "/Arentis/",
-  "start_url": "/Arentis/",
+  "start_url": "/Arentis/index.html",
   "scope": "/Arentis/",
   "display": "standalone",
   "background_color": "#ffffff",
